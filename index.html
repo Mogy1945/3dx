@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X3D - 3D Twitter Clone</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .ui-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .compose-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 20px;
+            min-width: 500px;
+            pointer-events: all;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .compose-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: #fff;
+            padding: 12px 16px;
+            font-size: 16px;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        .compose-input:focus {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: #1d9bf0;
+            box-shadow: 0 0 0 2px rgba(29, 155, 240, 0.2);
+        }
+
+        .compose-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+        }
+
+        .char-count {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+        }
+
+        .tweet-button {
+            background: #1d9bf0;
+            color: white;
+            border: none;
+            padding: 8px 24px;
+            border-radius: 9999px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 15px;
+        }
+
+        .tweet-button:hover:not(:disabled) {
+            background: #1a8cd8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(29, 155, 240, 0.4);
+        }
+
+        .tweet-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            pointer-events: all;
+        }
+
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .logo {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 32px;
+            font-weight: bold;
+            background: linear-gradient(45deg, #1d9bf0, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            pointer-events: all;
+        }
+
+        .tweet-detail {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 500px;
+            display: none;
+            pointer-events: all;
+            z-index: 100;
+        }
+
+        .tweet-detail.active {
+            display: block;
+        }
+
+        .tweet-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 16px;
+        }
+
+        .tweet-detail-author {
+            font-weight: 600;
+            color: #1d9bf0;
+        }
+
+        .close-button {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            font-size: 20px;
+        }
+
+        .tweet-detail-text {
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .tweet-detail-actions {
+            display: flex;
+            gap: 24px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .action-button {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.2s;
+        }
+
+        .action-button:hover {
+            color: #1d9bf0;
+        }
+
+        .action-button.liked {
+            color: #f91880;
+        }
+
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            color: #1d9bf0;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    
+    <div class="ui-overlay">
+        <div class="logo">X3D</div>
+        
+        <div class="controls">
+            <div class="control-item">
+                <span>🎮 マウスドラッグ: 回転</span>
+            </div>
+            <div class="control-item">
+                <span>🖱️ スクロール: ズーム</span>
+            </div>
+            <div class="control-item">
+                <span>🖱️ クリック: ツイート選択</span>
+            </div>
+        </div>
+
+        <div class="compose-panel">
+            <textarea 
+                class="compose-input" 
+                placeholder="3D空間に何を投稿する？"
+                rows="2"
+                maxlength="280"
+            ></textarea>
+            <div class="compose-actions">
+                <span class="char-count">0/280</span>
+                <button class="tweet-button" disabled>宇宙に投稿</button>
+            </div>
+        </div>
+
+        <div class="tweet-detail" id="tweet-detail">
+            <div class="tweet-detail-header">
+                <div>
+                    <div class="tweet-detail-author" id="detail-author"></div>
+                    <div style="color: rgba(255, 255, 255, 0.5); font-size: 14px;" id="detail-time"></div>
+                </div>
+                <button class="close-button" onclick="closeTweetDetail()">✕</button>
+            </div>
+            <div class="tweet-detail-text" id="detail-text"></div>
+            <div class="tweet-detail-actions">
+                <button class="action-button" id="detail-like" onclick="handleDetailLike()">
+                    <span id="like-icon">🤍</span>
+                    <span id="like-count">0</span>
+                </button>
+                <button class="action-button" onclick="handleDetailRetweet()">
+                    <span>🔁</span>
+                    <span id="retweet-count">0</span>
+                </button>
+                <button class="action-button" onclick="handleDetailReply()">
+                    <span>💬</span>
+                    <span id="reply-count">0</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading" id="loading">初期化中...</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Global variables
+        let scene, camera, renderer;
+        let tweets = [];
+        let tweetMeshes = [];
+        let raycaster, mouse;
+        let selectedTweet = null;
+        let nextId = 1;
+
+        // Wait for THREE.js to load
+        function waitForThree() {
+            if (typeof THREE === 'undefined') {
+                setTimeout(waitForThree, 100);
+                return;
+            }
+            init();
+        }
+
+        // Initialize Three.js
+        function init() {
+            try {
+                // Scene setup
+                scene = new THREE.Scene();
+                scene.fog = new THREE.Fog(0x000000, 10, 50);
+
+                // Camera setup
+                camera = new THREE.PerspectiveCamera(
+                    75,
+                    window.innerWidth / window.innerHeight,
+                    0.1,
+                    1000
+                );
+                camera.position.z = 20;
+
+                // Renderer setup
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                const container = document.getElementById('canvas-container');
+                if (container) {
+                    container.appendChild(renderer.domElement);
+                }
+
+                // Lighting
+                const ambientLight = new THREE.AmbientLight(0x404040);
+                scene.add(ambientLight);
+
+                const pointLight = new THREE.PointLight(0x1d9bf0, 1);
+                pointLight.position.set(10, 10, 10);
+                scene.add(pointLight);
+
+                // Raycaster for mouse interaction
+                raycaster = new THREE.Raycaster();
+                mouse = new THREE.Vector2();
+
+                // Add stars background
+                addStars();
+
+                // Add initial tweets
+                addSampleTweets();
+
+                // Setup event listeners
+                setupEventListeners();
+
+                // Start animation
+                animate();
+
+                // Hide loading
+                const loadingEl = document.getElementById('loading');
+                if (loadingEl) {
+                    loadingEl.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Initialization error:', error);
+                const loadingEl = document.getElementById('loading');
+                if (loadingEl) {
+                    loadingEl.textContent = 'エラーが発生しました';
+                }
+            }
+        }
+
+        // Add stars to background
+        function addStars() {
+            const geometry = new THREE.BufferGeometry();
+            const vertices = [];
+
+            for (let i = 0; i < 10000; i++) {
+                vertices.push(
+                    (Math.random() - 0.5) * 200,
+                    (Math.random() - 0.5) * 200,
+                    (Math.random() - 0.5) * 200
+                );
+            }
+
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+
+            const material = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 0.1,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            const stars = new THREE.Points(geometry, material);
+            scene.add(stars);
+        }
+
+        // Create tweet mesh
+        function createTweetMesh(tweet) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 256;
+
+            // Background
+            context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Border
+            context.strokeStyle = '#1d9bf0';
+            context.lineWidth = 2;
+            context.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+
+            // Author
+            context.fillStyle = '#1d9bf0';
+            context.font = 'bold 20px Arial';
+            context.fillText(tweet.author.name, 20, 40);
+
+            // Handle
+            context.fillStyle = '#666';
+            context.font = '16px Arial';
+            context.fillText(tweet.author.handle, 20, 65);
+
+            // Text
+            context.fillStyle = '#fff';
+            context.font = '18px Arial';
+            const words = tweet.text.split(' ');
+            let line = '';
+            let y = 100;
+
+            for (let i = 0; i < words.length; i++) {
+                const testLine = line + words[i] + ' ';
+                const metrics = context.measureText(testLine);
+                const testWidth = metrics.width;
+
+                if (testWidth > canvas.width - 40 && i > 0) {
+                    context.fillText(line, 20, y);
+                    line = words[i] + ' ';
+                    y += 25;
+                } else {
+                    line = testLine;
+                }
+            }
+            context.fillText(line, 20, y);
+
+            // Stats
+            context.fillStyle = '#666';
+            context.font = '14px Arial';
+            context.fillText(`❤ ${tweet.likes}  🔁 ${tweet.retweets}  💬 ${tweet.replies}`, 20, canvas.height - 20);
+
+            // Create texture
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                opacity: 0.9
+            });
+
+            const geometry = new THREE.PlaneGeometry(5, 2.5);
+            const mesh = new THREE.Mesh(geometry, material);
+
+            // Random position
+            mesh.position.x = (Math.random() - 0.5) * 30;
+            mesh.position.y = (Math.random() - 0.5) * 20;
+            mesh.position.z = (Math.random() - 0.5) * 20;
+
+            // Store tweet data
+            mesh.userData = { tweet, canvas, context };
+
+            return mesh;
+        }
+
+        // Update tweet mesh
+        function updateTweetMesh(mesh) {
+            const { tweet, canvas, context } = mesh.userData;
+
+            // Clear and redraw
+            context.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Background
+            context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Border (highlight if selected)
+            context.strokeStyle = mesh === selectedTweet ? '#00ff88' : '#1d9bf0';
+            context.lineWidth = mesh === selectedTweet ? 3 : 2;
+            context.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+
+            // Author
+            context.fillStyle = '#1d9bf0';
+            context.font = 'bold 20px Arial';
+            context.fillText(tweet.author.name, 20, 40);
+
+            // Handle
+            context.fillStyle = '#666';
+            context.font = '16px Arial';
+            context.fillText(tweet.author.handle, 20, 65);
+
+            // Text
+            context.fillStyle = '#fff';
+            context.font = '18px Arial';
+            const words = tweet.text.split(' ');
+            let line = '';
+            let y = 100;
+
+            for (let i = 0; i < words.length; i++) {
+                const testLine = line + words[i] + ' ';
+                const metrics = context.measureText(testLine);
+                const testWidth = metrics.width;
+
+                if (testWidth > canvas.width - 40 && i > 0) {
+                    context.fillText(line, 20, y);
+                    line = words[i] + ' ';
+                    y += 25;
+                } else {
+                    line = testLine;
+                }
+            }
+            context.fillText(line, 20, y);
+
+            // Stats
+            context.fillStyle = '#666';
+            context.font = '14px Arial';
+            context.fillText(`❤ ${tweet.likes}  🔁 ${tweet.retweets}  💬 ${tweet.replies}`, 20, canvas.height - 20);
+
+            // Update texture
+            mesh.material.map.needsUpdate = true;
+        }
+
+        // Add new tweet
+        function addTweet(text) {
+            const tweet = {
+                id: nextId++,
+                text: text,
+                author: {
+                    name: "あなた",
+                    handle: "@you",
+                    avatar: "あ"
+                },
+                timestamp: new Date(),
+                likes: 0,
+                retweets: 0,
+                replies: 0,
+                liked: false,
+                retweeted: false
+            };
+
+            tweets.push(tweet);
+
+            const mesh = createTweetMesh(tweet);
+            scene.add(mesh);
+            tweetMeshes.push(mesh);
+
+            // Animate entrance
+            mesh.scale.set(0, 0, 0);
+            animateTweetEntrance(mesh);
+        }
+
+        // Animate tweet entrance
+        function animateTweetEntrance(mesh) {
+            const targetScale = 1;
+            const duration = 1000;
+            const start = Date.now();
+
+            function animate() {
+                const elapsed = Date.now() - start;
+                const progress = Math.min(elapsed / duration, 1);
+                const scale = progress * targetScale;
+
+                mesh.scale.set(scale, scale, scale);
+                mesh.rotation.y = (1 - progress) * Math.PI * 2;
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                }
+            }
+
+            animate();
+        }
+
+        // Add sample tweets
+        function addSampleTweets() {
+            const sampleTweets = [
+                {
+                    text: "3D空間へようこそ！ここは新しいソーシャルメディアの形です。",
+                    author: { name: "システム", handle: "@system", avatar: "S" }
+                },
+                {
+                    text: "ツイートが宇宙空間に浮遊しています。マウスで回転、スクロールでズームできます。",
+                    author: { name: "ガイド", handle: "@guide", avatar: "G" }
+                },
+                {
+                    text: "各ツイートをクリックすると詳細が表示されます。革新的でしょう？",
+                    author: { name: "開発者", handle: "@dev", avatar: "D" }
+                }
+            ];
+
+            sampleTweets.forEach((data, index) => {
+                setTimeout(() => {
+                    const tweet = {
+                        id: nextId++,
+                        ...data,
+                        timestamp: new Date(Date.now() - (index + 1) * 3600000),
+                        likes: Math.floor(Math.random() * 10),
+                        retweets: Math.floor(Math.random() * 5),
+                        replies: Math.floor(Math.random() * 3),
+                        liked: false,
+                        retweeted: false
+                    };
+
+                    tweets.push(tweet);
+
+                    const mesh = createTweetMesh(tweet);
+                    scene.add(mesh);
+                    tweetMeshes.push(mesh);
+
+                    animateTweetEntrance(mesh);
+                }, index * 500);
+            });
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            if (!renderer || !renderer.domElement) return;
+
+            let mouseDown = false;
+            let mouseX = 0;
+            let mouseY = 0;
+
+            renderer.domElement.addEventListener('mousedown', (e) => {
+                mouseDown = true;
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+
+            renderer.domElement.addEventListener('mouseup', (e) => {
+                if (Math.abs(e.clientX - mouseX) < 5 && Math.abs(e.clientY - mouseY) < 5) {
+                    // Click detected
+                    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+                    raycaster.setFromCamera(mouse, camera);
+                    const intersects = raycaster.intersectObjects(tweetMeshes);
+
+                    if (intersects.length > 0) {
+                        selectTweet(intersects[0].object);
+                    }
+                }
+                mouseDown = false;
+            });
+
+            renderer.domElement.addEventListener('mousemove', (e) => {
+                if (!mouseDown) return;
+
+                const deltaX = e.clientX - mouseX;
+                const deltaY = e.clientY - mouseY;
+
+                scene.rotation.y += deltaX * 0.01;
+                scene.rotation.x += deltaY * 0.01;
+
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+
+            renderer.domElement.addEventListener('wheel', (e) => {
+                camera.position.z += e.deltaY * 0.01;
+                camera.position.z = Math.max(5, Math.min(50, camera.position.z));
+            });
+
+            // Input handling
+            const tweetInput = document.querySelector('.compose-input');
+            const tweetButton = document.querySelector('.tweet-button');
+            const charCount = document.querySelector('.char-count');
+
+            if (tweetInput && tweetButton && charCount) {
+                tweetInput.addEventListener('input', function() {
+                    const length = this.value.length;
+                    charCount.textContent = `${length}/280`;
+                    tweetButton.disabled = length === 0 || length > 280;
+                });
+
+                tweetButton.addEventListener('click', () => {
+                    const text = tweetInput.value.trim();
+                    if (text && text.length <= 280) {
+                        addTweet(text);
+                        tweetInput.value = '';
+                        charCount.textContent = '0/280';
+                        tweetButton.disabled = true;
+                    }
+                });
+
+                tweetInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                        tweetButton.click();
+                    }
+                });
+            }
+
+            // Window resize
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        // Select tweet
+        function selectTweet(mesh) {
+            if (selectedTweet) {
+                updateTweetMesh(selectedTweet);
+            }
+
+            selectedTweet = mesh;
+            updateTweetMesh(mesh);
+
+            const tweet = mesh.userData.tweet;
+            const detailAuthor = document.getElementById('detail-author');
+            const detailTime = document.getElementById('detail-time');
+            const detailText = document.getElementById('detail-text');
+            const likeCount = document.getElementById('like-count');
+            const retweetCount = document.getElementById('retweet-count');
+            const replyCount = document.getElementById('reply-count');
+            const likeIcon = document.getElementById('like-icon');
+            const likeButton = document.getElementById('detail-like');
+            const tweetDetail = document.getElementById('tweet-detail');
+
+            if (detailAuthor) detailAuthor.textContent = tweet.author.name;
+            if (detailTime) detailTime.textContent = formatTime(tweet.timestamp);
+            if (detailText) detailText.textContent = tweet.text;
+            if (likeCount) likeCount.textContent = tweet.likes;
+            if (retweetCount) retweetCount.textContent = tweet.retweets;
+            if (replyCount) replyCount.textContent = tweet.replies;
+            
+            if (likeButton && likeIcon) {
+                if (tweet.liked) {
+                    likeButton.classList.add('liked');
+                    likeIcon.textContent = '❤️';
+                } else {
+                    likeButton.classList.remove('liked');
+                    likeIcon.textContent = '🤍';
+                }
+            }
+
+            if (tweetDetail) {
+                tweetDetail.classList.add('active');
+            }
+        }
+
+        // Close tweet detail
+        window.closeTweetDetail = function() {
+            const tweetDetail = document.getElementById('tweet-detail');
+            if (tweetDetail) {
+                tweetDetail.classList.remove('active');
+            }
+            if (selectedTweet) {
+                updateTweetMesh(selectedTweet);
+                selectedTweet = null;
+            }
+        }
+
+        // Handle detail actions
+        window.handleDetailLike = function() {
+            if (!selectedTweet) return;
+
+            const tweet = selectedTweet.userData.tweet;
+            tweet.liked = !tweet.liked;
+            tweet.likes += tweet.liked ? 1 : -1;
+
+            updateTweetMesh(selectedTweet);
+            selectTweet(selectedTweet);
+        }
+
+        window.handleDetailRetweet = function() {
+            if (!selectedTweet) return;
+
+            const tweet = selectedTweet.userData.tweet;
+            tweet.retweeted = !tweet.retweeted;
+            tweet.retweets += tweet.retweeted ? 1 : -1;
+
+            updateTweetMesh(selectedTweet);
+            selectTweet(selectedTweet);
+        }
+
+        window.handleDetailReply = function() {
+            console.log('Reply functionality');
+        }
+
+        // Format time
+        function formatTime(date) {
+            const now = new Date();
+            const diff = now - date;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+
+            if (minutes < 1) return '今';
+            if (minutes < 60) return `${minutes}分前`;
+            if (hours < 24) return `${hours}時間前`;
+            if (days < 7) return `${days}日前`;
+            
+            return date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Floating animation for tweets
+            tweetMeshes.forEach((mesh, index) => {
+                mesh.position.y += Math.sin(Date.now() * 0.001 + index) * 0.01;
+                mesh.rotation.z = Math.sin(Date.now() * 0.0005 + index) * 0.05;
+            });
+
+            // Auto rotation
+            scene.rotation.y += 0.001;
+
+            renderer.render(scene, camera);
+        }
+
+        // Start initialization
+        waitForThree();
+    </script>
+</body>
+</html>
